@@ -123,11 +123,14 @@ LIBS += -L$$PWD/external_dependencies/camera_basler/lib/x64
 INCLUDEPATH += $$PWD/external_dependencies/camera_basler/include
 DEPENDPATH += $$PWD/external_dependencies/camera_basler/include
 
-#eigen
-INCLUDEPATH += D:/you_need/eigen-5.0.0/eigen-5.0.0
+# 本地环境配置（Eigen、OpenCV路径等）
+# 每人复制 local_config.pri.example 为 local_config.pri 并填入本地路径
+include(local_config.pri)
+
+# Eigen
+INCLUDEPATH += $$EIGEN_PATH
 
 # OpenCV配置
-OPENCV_PATH = D:/you_need/opencv/opencv/build
 
 INCLUDEPATH += $$OPENCV_PATH/include
 # 根据编译模式链接对应的 OpenCV 库

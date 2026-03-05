@@ -18,6 +18,9 @@ qrc_*
 .qtc_clangd/
 .claude/
 
+# 本地环境配置（每人路径不同）
+local_config.pri
+
 # 临时文件
 *.tmp
 nul

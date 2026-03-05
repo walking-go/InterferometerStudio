@@ -1,0 +1,9 @@
+# 本地环境配置模板
+# 复制此文件为 local_config.pri 并修改为你本地的路径
+# local_config.pri 不会被 Git 跟踪，每人各自维护
+
+# Eigen 路径
+EIGEN_PATH = D:/you_need/eigen-5.0.0/eigen-5.0.0
+
+# OpenCV 路径（build 目录）
+OPENCV_PATH = D:/you_need/opencv/opencv/build
