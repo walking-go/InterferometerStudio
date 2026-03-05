@@ -1,0 +1,25 @@
+# 编译输出
+build/
+release/
+debug/
+*.o
+*.obj
+*.exe
+
+# Qt 生成文件
+Makefile*
+.qmake.stash
+*.pro.user
+moc_*
+ui_*
+qrc_*
+
+# IDE
+.qtc_clangd/
+.claude/
+
+# 临时文件
+*.tmp
+nul
+# 大文件（DLL）
+*.dll
