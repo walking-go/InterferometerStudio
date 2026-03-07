@@ -1,6 +1,6 @@
 #include "APDA.h"
 #include <iostream>
-#include "deltaEstmationNPDA.h"
+#include "initCoeffEst_NLS.h"
 #include "fringePatternNormalization.h"
 #include "NPDA.h"
 #include "PhaseProcessor.h"
@@ -14,7 +14,6 @@ cv::Mat APDA(
     double maxTiltFactor
     )
 {
-    const double resThresh = 1;
     const int estSize = 256;
     const size_t nCapture = noisedIs.size();
 
@@ -46,7 +45,7 @@ cv::Mat APDA(
     result.outputMask.convertTo(outputMask_8u, CV_8U);
     cv::bitwise_and(mask_8u, outputMask_8u, combinedMask);
 
-    DeltaEstimationResult npdaResult = deltaEstmationNPDA(noisedIs256, maxTiltFactor, combinedMask);
+    DeltaEstimationResult npdaResult = initCoeffEst_NLS(result.normalizedIs, maxTiltFactor, combinedMask);
 
 
     CoeffsMDPD initCoeffsMDPD;
@@ -67,8 +66,8 @@ cv::Mat APDA(
     std::vector<double> retainedKys;
     std::vector<double> retainedDs;
 
-    for (size_t i = 0; i < npdaResult.resErrs.size(); ++i) {
-        if (npdaResult.resErrs[i] < resThresh) {
+    for (size_t i = 0; i < npdaResult.reliable.size(); ++i) {
+        if (npdaResult.reliable[i]) {
             retainedIs.push_back(noisedIs[i].clone());
             retainedKxs.push_back(initCoeffsMDPD.kxs[i]);
             retainedKys.push_back(initCoeffsMDPD.kys[i]);

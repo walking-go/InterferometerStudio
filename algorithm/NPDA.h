@@ -1,7 +1,12 @@
 #pragma once
 #include <vector>
 #include <opencv2/opencv.hpp>
-#include "deltaEstmationNPDA.h"
+
+struct CoeffsMDPD {
+    std::vector<double> kxs;
+    std::vector<double> kys;
+    std::vector<double> ds;
+};
 
 // 输出结果结构体
 struct NPDAResult {

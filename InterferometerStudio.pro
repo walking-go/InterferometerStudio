@@ -17,8 +17,7 @@ SOURCES += \
     algorithm/NPDA.cpp \
     algorithm/PhaseProcessor.cpp \
     algorithm/PhaseUnwrapper.cpp \
-    algorithm/czt2.cpp \
-    algorithm/deltaEstmationNPDA.cpp \
+    algorithm/initCoeffEst_NLS.cpp \
     algorithm/fringePatternNormalization.cpp \
     algorithm/utils.cpp \
     basler_camera_controller.cpp \
@@ -63,8 +62,7 @@ HEADERS += \
     algorithm/PhaseProcessor.h \
     algorithm/PhaseUnwrapper.h \
     algorithm/alg.h \
-    algorithm/czt2.h \
-    algorithm/deltaEstmationNPDA.h \
+    algorithm/initCoeffEst_NLS.h \
     algorithm/fringePatternNormalization.h \
     algorithm/utils.h \
     basler_camera_controller.h \

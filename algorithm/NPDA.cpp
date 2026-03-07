@@ -8,6 +8,8 @@
 
 // 为了 `solvePsiCoeffs` 中高效的线性代数运算，引入 Eigen
 #include <Eigen/Dense>
+#include <chrono>
+#include <QDebug>
 
 // 内部辅助函数，实现 solvePsiCoeffs
 // 使用 Eigen 进行核心计算
@@ -117,7 +119,8 @@ NPDAResult NPDA(
     const CoeffsMDPD& initCoeffs,
     const cv::Mat& ROI)
 {
-    std::cout << "开始执行：NPDA迭代优化" << std::endl;
+    qDebug() << "开始执行：NPDA迭代优化";
+    auto npdaStartTime = std::chrono::high_resolution_clock::now();
 
     // 初始化和参数设置
     const int N = static_cast<int>(inputIs.size());
@@ -272,7 +275,9 @@ NPDAResult NPDA(
         result.historyEIt.push_back(EIt);
     }
 
-    std::cout << "执行完成：NPDA迭代优化, 总迭代次数: " << result.nIters << std::endl;
+    auto npdaEndTime = std::chrono::high_resolution_clock::now();
+    double npdaElapsed = std::chrono::duration<double>(npdaEndTime - npdaStartTime).count();
+    qDebug() << QString("执行完成：NPDA迭代优化，迭代次数: %1，耗时 %2 秒").arg(result.nIters).arg(npdaElapsed, 0, 'f', 3);
     return result;
 }
 
