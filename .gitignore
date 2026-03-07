@@ -21,6 +21,9 @@ qrc_*
 # 本地环境配置（每人路径不同）
 local_config.pri
 
+# 数据文件夹
+data/
+
 # 临时文件
 *.tmp
 nul
