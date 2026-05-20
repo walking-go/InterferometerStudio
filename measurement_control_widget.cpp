@@ -198,6 +198,7 @@ void MeasurementControlWidget::startCapture()
     {
         QMutexLocker locker(&m_mutex);
         m_targetCount = ui->spinBox_imageCount->value();
+        m_stepSizeUsteps = static_cast<int>(ui->doubleSpinBox_stepSize->value() * 2048.0);
         m_capturedImages.clear();
         m_capturedImages.reserve(m_targetCount);
         m_firstImage = QImage();
@@ -219,27 +220,14 @@ void MeasurementControlWidget::startCapture()
     updateProgress(0);
 
 
-    // 创建定时采集定时器
-    if (!m_captureTimer) {
-        m_captureTimer = new QTimer(this);
-        connect(m_captureTimer, &QTimer::timeout,
-                this, &MeasurementControlWidget::onCaptureTimerTimeout);
-    }
-
-    // 发送第一次电机命令
+    // 严格串行流水线：运动 → 稳定(200ms) → 采集 → 等待(100ms) → 运动
+    // 发送第一次电机命令，等待稳定后采集
     sendMotorCommand(0);
-
-    // 启动定时器，定时触发采集
-    m_captureTimer->start(m_captureInterval);
+    QTimer::singleShot(SETTLE_TIME_MS, this, &MeasurementControlWidget::onSettlingComplete);
 }
 
 void MeasurementControlWidget::stopCapture()
 {
-    // 停止定时器
-    if (m_captureTimer) {
-        m_captureTimer->stop();
-    }
-
     // 关闭测量采集模式
     if (m_cameraThread) {
         m_cameraThread->setMeasurementCapturing(false);
@@ -299,7 +287,7 @@ void MeasurementControlWidget::onSingleImageCaptured(const QImage& image)
     int imageIndex = static_cast<int>(m_capturedImages.size()) + 1;
     if (!m_currentSessionPath.isEmpty()) {
         QString filePath = m_currentSessionPath + "/captured_images/"
-                           + QString("img_%1.png").arg(imageIndex, 3, 10, QChar('0'));
+                           + QString("img_%1.bmp").arg(imageIndex, 3, 10, QChar('0'));
         QImage imageToSave = croppedImage.copy();  // 复制一份用于异步保存
         QtConcurrent::run([filePath, imageToSave]() {
             if (imageToSave.save(filePath)) {
@@ -331,25 +319,12 @@ void MeasurementControlWidget::onSingleImageCaptured(const QImage& image)
     updateProgress(progress);
     updateStatus(QString("采集中 (%1/%2)").arg(current).arg(target));
 
-    // 检查是否采集完成（由定时器控制流程，这里只做完成检查）
-    if (current >= target) {
-        // 停止定时器
-        if (m_captureTimer) {
-            m_captureTimer->stop();
-        }
-        qDebug() << "[MeasurementControlWidget] 全部采集完成，开始处理";
-        startProcessing();
-    }
-    // 注意：不再在这里触发下一次移动，改由定时器控制
+    // 严格串行：采集完成后等待POST_CAPTURE_WAIT_MS，再进入下一步
+    QTimer::singleShot(POST_CAPTURE_WAIT_MS, this, &MeasurementControlWidget::onPostCaptureComplete);
 }
 
 void MeasurementControlWidget::startProcessing()
 {
-    // 停止定时器
-    if (m_captureTimer) {
-        m_captureTimer->stop();
-    }
-
     // 关闭测量采集模式，恢复预览
     if (m_cameraThread) {
         m_cameraThread->setMeasurementCapturing(false);
@@ -432,16 +407,19 @@ void MeasurementControlWidget::updateUI()
         ui->btn_startMeasurement->setText("执行测量");
         ui->btn_startMeasurement->setEnabled(true);
         ui->spinBox_imageCount->setEnabled(true);
+        ui->doubleSpinBox_stepSize->setEnabled(true);
         break;
     case Capturing:
         ui->btn_startMeasurement->setText("停止采集");
         ui->btn_startMeasurement->setEnabled(true);
         ui->spinBox_imageCount->setEnabled(false);
+        ui->doubleSpinBox_stepSize->setEnabled(false);
         break;
     case Processing:
         ui->btn_startMeasurement->setText("处理中...");
         ui->btn_startMeasurement->setEnabled(false);
         ui->spinBox_imageCount->setEnabled(false);
+        ui->doubleSpinBox_stepSize->setEnabled(false);
         break;
     }
 }
@@ -547,39 +525,36 @@ void MeasurementControlWidget::moveSingleAxis(const QString& axis, int usteps)
     m_motorController->movedX(usteps, axis);
 }
 
-void MeasurementControlWidget::onCaptureTimerTimeout()
+void MeasurementControlWidget::onSettlingComplete()
 {
-    // 检查状态
+    // 电机稳定等待完成，触发图像采集
     if (m_state != Capturing) {
-        if (m_captureTimer) {
-            m_captureTimer->stop();
-        }
         return;
     }
 
-    int currentCaptured = static_cast<int>(m_capturedImages.size());
+    // 设置等待标志，相机线程会发送图像
+    m_waitingForImage = true;
+}
+
+void MeasurementControlWidget::onPostCaptureComplete()
+{
+    // 采集后等待完成，检查是否继续
+    if (m_state != Capturing) {
+        return;
+    }
+
+    int current = static_cast<int>(m_capturedImages.size());
     int target = m_targetCount;
 
-    // 检查是否已采集完成
-    if (currentCaptured >= target) {
-        m_captureTimer->stop();
-        qDebug() << "[MeasurementControlWidget] 定时器：采集完成";
+    if (current >= target) {
+        qDebug() << "[MeasurementControlWidget] 全部采集完成，开始处理";
         startProcessing();
         return;
     }
 
-    // 1. 触发图像采集（设置等待标志，相机线程会发送图像）
-    m_waitingForImage = true;
-
-    // 2. 发送下一次电机命令（当前步骤+1，因为当前步骤的电机命令已在上一次发送）
-    int nextStep = m_currentStep + 1;
-    if (nextStep < target) {
-        sendMotorCommand(nextStep);
-    }
-
-    // 更新当前步骤
-    m_currentStep = nextStep;
-
+    // 发送下一步电机命令，等待稳定后采集
+    sendMotorCommand(current);  // current即为下一帧的step索引
+    QTimer::singleShot(SETTLE_TIME_MS, this, &MeasurementControlWidget::onSettlingComplete);
 }
 
 void MeasurementControlWidget::sendMotorCommand(int step)
@@ -624,7 +599,7 @@ void MeasurementControlWidget::sendMotorCommand(int step)
         break;
     }
 
-    int usteps = moveForward ? 2048 : -2048;
+    int usteps = moveForward ? m_stepSizeUsteps : -m_stepSizeUsteps;
 
     moveSingleAxis(axis, usteps);
 }

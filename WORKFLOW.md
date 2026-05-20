@@ -73,8 +73,7 @@ git pull origin main
 | `APDAProcessor.cpp/h`              | 算法入口      |
 | `APDA.cpp/h`                       | APDA 核心   |
 | `NPDA.cpp/h`                       | NPDA 迭代优化 |
-| `deltaEstmationNPDA.cpp/h`         | 初值估计      |
-| `czt2.cpp/h`                       | CZT 变换    |
+| `initCoeffEst_NLS.cpp/h`           | 初值估计（NLS） |
 | `fringePatternNormalization.cpp/h` | 条纹归一化     |
 | `PhaseProcessor.cpp/h`             | 相位后处理     |
 | `PhaseUnwrapper.cpp/h`             | 相位解包裹     |

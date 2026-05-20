@@ -132,10 +132,11 @@ private:
     // 往返移动测量相关
     int m_currentStep = 0;           // 当前步骤（0-49）
     bool m_waitingForImage = false;  // 是否正在等待图像采集
+    int m_stepSizeUsteps = 2048;     // 电机步长（微步数），1μm = 2048微步
 
-    // 定时采集相关
-    QTimer* m_captureTimer = nullptr;   // 定时采集定时器
-    int m_captureInterval = 150;        // 采集间隔(ms)，可调整测试
+    // 采集时序常量
+    static constexpr int SETTLE_TIME_MS = 200;       // 电机稳定等待时间(ms)
+    static constexpr int POST_CAPTURE_WAIT_MS = 100;  // 采集后等待时间(ms)
 
     // 图像裁剪器（自动检测并裁剪，暂时只使用固定ROI函数）
     ImageCropper m_imageCropper;
@@ -175,10 +176,14 @@ private:
     // void moveMotorAndCapture();
 
     /**
-     * @brief onCaptureTimerTimeout 定时采集定时器触发
-     * 并行执行：采集当前图像 + 发送下一次电机命令
+     * @brief onSettlingComplete 电机稳定等待完成，触发图像采集
      */
-    void onCaptureTimerTimeout();
+    void onSettlingComplete();
+
+    /**
+     * @brief onPostCaptureComplete 采集后等待完成，进入下一步
+     */
+    void onPostCaptureComplete();
 
     /**
      * @brief sendMotorCommand 发送电机移动命令（不等待）

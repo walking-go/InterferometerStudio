@@ -23,11 +23,10 @@ APDA (Adaptive Phase Detection Algorithm) 是一种用于干涉图相位提取�
 | `APDAProcessor.cpp/h` | 算法入口，负责图像预处理和调用核心算法 |
 | `APDA.cpp/h` | APDA 核心算法实现 |
 | `NPDA.cpp/h` | 非线性相位检测算法（迭代优化） |
-| `deltaEstmationNPDA.cpp/h` | 倾斜移相系数初值估计 |
+| `initCoeffEst_NLS.cpp/h` | 倾斜移相系数初值估计（NLS 网格搜索 + 线性最小二乘） |
 | `fringePatternNormalization.cpp/h` | 条纹图归一化处理 |
 | `PhaseProcessor.cpp/h` | 相位后处理（解包裹、去倾斜、Zernike拟合） |
 | `PhaseUnwrapper.cpp/h` | 相位解包裹实现 |
-| `czt2.cpp/h` | 2D Chirp-Z 变换 |
 | `utils.cpp/h` | 工具函数（文件加载、mask创建、显示等） |
 | `alg.cpp/h` | 其他辅助算法 |
 
@@ -68,9 +67,8 @@ struct DeltaEstimationResult {
     std::vector<double> estKxs;     // X方向倾斜系数
     std::vector<double> estKys;     // Y方向倾斜系数
     std::vector<double> estDs;      // 相位偏移量
-    std::vector<double> resErrs;    // 残差误差（用于图像筛选）
-    std::vector<cv::Mat> estDeltas; // 估计的相位差
-    std::vector<cv::Mat> estPhase;  // 估计的相位
+    std::vector<double> resErrs;    // 残差误差
+    std::vector<bool> reliable;     // 可靠性标记（用于图像筛选）
 };
 ```
 
@@ -142,7 +140,7 @@ cv::Mat APDA(
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `resThresh` | 0.4 | 残差阈值，用于筛选有效图像 |
+| `reliableThresh` | 0.17 | 残差阈值，用于筛选有效图像（NLS 内部判定） |
 | `estSize` | 256 | 初值估计使用的图像尺寸 |
 
 ---
@@ -251,10 +249,10 @@ ROI 裁剪 (默认 512x512)
 
 算法各阶段的执行时间会输出到控制台：
 ```
---- fringePatternNormalization function time: Xms ---
---- deltaEstmation function time: Xms ---
---- NPDA function time: Xms ---
---- Processor function time: Xms ---
+开始执行：NLS初值估计
+执行完成：NLS初值估计，耗时 X.XXX 秒
+开始执行：NPDA迭代优化
+执行完成：NPDA迭代优化，迭代次数: X，耗时 X.XXX 秒
 ```
 
 ---
@@ -263,6 +261,7 @@ ROI 裁剪 (默认 512x512)
 
 | 日期 | 变更内容 |
 |------|----------|
+| 2025-03-07 | 初值估计替换为 NLS（initCoeffEst_NLS），移除 CZT/deltaEstmationNPDA |
 | 2024-12-18 | 添加详细调试输出 |
 | 2024-12-18 | 统一 resThresh 为 0.4 |
 | 2024-12-18 | 创建本文档 |
