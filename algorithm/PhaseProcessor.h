@@ -3,18 +3,36 @@
 #include <opencv2/opencv.hpp>
 #include "PhaseUnwrapper.h"
 #include <Eigen/Dense>
-#include <vector> 
+#include <vector>
+#include <cstdint>
 
 
 // 封装相位后处理的完整流程
 class PhaseProcessor {
 public:
     PhaseProcessor();
+
+    // Zernike term bit flags for removeZernikeTerms()
+    static constexpr uint32_t ZERNIKE_PISTON      = 0x01;  // Z[0]
+    static constexpr uint32_t ZERNIKE_TILT         = 0x02;  // Z[1], Z[2]
+    static constexpr uint32_t ZERNIKE_POWER        = 0x04;  // Z[3]
+    static constexpr uint32_t ZERNIKE_ASTIGMATISM  = 0x08;  // Z[4], Z[5]
+    static constexpr uint32_t ZERNIKE_COMA         = 0x10;  // Z[6], Z[7]
+    static constexpr uint32_t ZERNIKE_SPHERICAL    = 0x20;  // Z[10]
+
     cv::Mat postProcess(
         const cv::Mat& wrapped_phase,
         const cv::Mat& refPhase,
         const cv::Mat& mask,
-        char type = 'P'
+        char type = 'P',
+        cv::Mat* unwrapped_out = nullptr
+    );
+
+    // Selective Zernike term removal (operates on unwrapped phase)
+    cv::Mat removeZernikeTerms(
+        const cv::Mat& unwrapped_phase,
+        const cv::Mat& mask,
+        uint32_t removeMask
     );
 
 private:

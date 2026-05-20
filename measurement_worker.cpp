@@ -77,8 +77,8 @@ void MeasurementWorker::process()
     emit progress(20, "APDA算法处理中...");
 
     // 调用APDA算法
-    cv::Mat finalPhase;
-    finalPhase = m_processor->run(images);
+    cv::Mat finalPhase, unwrappedPhase, phaseMask;
+    finalPhase = m_processor->run(images, &unwrappedPhase, &phaseMask);
 
     // 立即释放输入图像内存
     images.clear();
@@ -95,6 +95,8 @@ void MeasurementWorker::process()
     // 构建结果
     APDAResult result;
     result.wavefront = finalPhase.clone();  // 深拷贝确保数据独立
+    result.unwrapped_phase = unwrappedPhase.clone();
+    result.phase_mask = phaseMask.clone();
     result.is_valid = true;
     result.wavefront_pv = calculatePV(finalPhase);
     result.wavefront_rms = calculateRMS(finalPhase);
@@ -170,7 +172,8 @@ void MeasurementWorker::processFromPath()
     emit progress(20, "APDA算法处理中...");
 
     // 调用APDA算法
-    cv::Mat finalPhase = m_processor->run(images);
+    cv::Mat unwrappedPhase2, phaseMask2;
+    cv::Mat finalPhase = m_processor->run(images, &unwrappedPhase2, &phaseMask2);
 
     // 立即释放输入图像内存
     images.clear();
@@ -195,6 +198,8 @@ void MeasurementWorker::processFromPath()
     // 构建结果
     APDAResult result;
     result.wavefront = finalPhase.clone();
+    result.unwrapped_phase = unwrappedPhase2.clone();
+    result.phase_mask = phaseMask2.clone();
     result.is_valid = true;
     result.wavefront_pv = calculatePV(finalPhase);
     result.wavefront_rms = calculateRMS(finalPhase);

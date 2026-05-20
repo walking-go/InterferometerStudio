@@ -18,7 +18,9 @@ public:
         );
 
     // 从内存中的图像列表运行APDA算法
-    cv::Mat run(const std::vector<cv::Mat>& capturedImages);
+    cv::Mat run(const std::vector<cv::Mat>& capturedImages,
+                cv::Mat* unwrappedPhase_out = nullptr,
+                cv::Mat* phaseMask_out = nullptr);
 
 private:
     int x1 = 1, y1 = 1;

@@ -53,7 +53,9 @@ cv::Mat APDAProcessor::run(
     return finalPhase;
 }
 
-cv::Mat APDAProcessor::run(const std::vector<cv::Mat>& capturedImages)
+cv::Mat APDAProcessor::run(const std::vector<cv::Mat>& capturedImages,
+                           cv::Mat* unwrappedPhase_out,
+                           cv::Mat* phaseMask_out)
 {
 
     if (capturedImages.empty()) {
@@ -83,7 +85,7 @@ cv::Mat APDAProcessor::run(const std::vector<cv::Mat>& capturedImages)
     cv::Mat mask = createMask(nr, nc);
 
     // === APDA 核心算法 ===
-    cv::Mat finalPhase = APDA(noisedIs, mask, maxTiltFactor);
+    cv::Mat finalPhase = APDA(noisedIs, mask, maxTiltFactor, unwrappedPhase_out, phaseMask_out);
 
     return finalPhase;
 }

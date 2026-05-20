@@ -12,7 +12,8 @@ cv::Mat PhaseProcessor::postProcess(
     const cv::Mat& wrapped_phase,
     const cv::Mat& refPhase,
     const cv::Mat& mask,
-    char type)
+    char type,
+    cv::Mat* unwrapped_out)
 {
     CV_Assert(wrapped_phase.type() == CV_64FC1);
     CV_Assert(wrapped_phase.dims == 2 && !wrapped_phase.empty());
@@ -28,8 +29,14 @@ cv::Mat PhaseProcessor::postProcess(
 
     // 解包裹
     cv::Mat unwrapped_phase = m_unwrapper.unwrapPathMask(wrapped_phase, effective_mask);
+
+    // Output unwrapped phase before Zernike removal (if requested)
+    if (unwrapped_out) {
+        *unwrapped_out = unwrapped_phase.clone();
+    }
+
     cv::Mat processed_phase = unwrapped_phase;
-  
+
     // 移除倾斜项
     if (type == 'P') {
         processed_phase = removeTilt(processed_phase, effective_mask);
@@ -49,7 +56,59 @@ cv::Mat PhaseProcessor::postProcess(
         }
     }
     return processed_phase;
-    
+
+}
+
+cv::Mat PhaseProcessor::removeZernikeTerms(
+    const cv::Mat& unwrapped_phase,
+    const cv::Mat& mask,
+    uint32_t removeMask)
+{
+    if (removeMask == 0) {
+        // No terms to remove — just apply mask
+        cv::Mat result = cv::Mat::zeros(unwrapped_phase.size(), unwrapped_phase.type());
+        unwrapped_phase.copyTo(result, mask);
+        return result;
+    }
+
+    // Need maxOrder=4 to include Spherical (Z[10])
+    ZernikeCoreResult coreData = _zernikeFitCore(unwrapped_phase, mask, 4);
+
+    // Build correction term from selected Zernike components
+    // Index mapping (from zernikeBasis traversal order):
+    //  Z[0]:  Piston        (n=0,m=0)
+    //  Z[1]:  Tilt-cos      (n=1,m=1)
+    //  Z[2]:  Tilt-sin      (n=1,m=1)
+    //  Z[3]:  Power/Defocus (n=2,m=0)
+    //  Z[4]:  Astig-cos     (n=2,m=2)
+    //  Z[5]:  Astig-sin     (n=2,m=2)
+    //  Z[6]:  Coma-cos      (n=3,m=1)
+    //  Z[7]:  Coma-sin      (n=3,m=1)
+    //  Z[8]:  Trefoil-cos   (n=3,m=3)
+    //  Z[9]:  Trefoil-sin   (n=3,m=3)
+    //  Z[10]: Spherical     (n=4,m=0)
+    //  Z[11]-Z[14]: higher order terms
+
+    cv::Mat correction = cv::Mat::zeros(unwrapped_phase.size(), unwrapped_phase.type());
+    int numTerms = static_cast<int>(coreData.coeffs.size());
+
+    auto addTerm = [&](int idx) {
+        if (idx < numTerms) {
+            correction += coreData.zernikeTerms[idx] * coreData.coeffs(idx);
+        }
+    };
+
+    if (removeMask & ZERNIKE_PISTON)     { addTerm(0); }
+    if (removeMask & ZERNIKE_TILT)       { addTerm(1); addTerm(2); }
+    if (removeMask & ZERNIKE_POWER)      { addTerm(3); }
+    if (removeMask & ZERNIKE_ASTIGMATISM){ addTerm(4); addTerm(5); }
+    if (removeMask & ZERNIKE_COMA)       { addTerm(6); addTerm(7); }
+    if (removeMask & ZERNIKE_SPHERICAL)  { addTerm(10); }
+
+    cv::Mat corrected = unwrapped_phase - correction;
+    cv::Mat result = cv::Mat::zeros(unwrapped_phase.size(), unwrapped_phase.type());
+    corrected.copyTo(result, coreData.finalMask);
+    return result;
 }
 
 // 移除平移项和倾斜项 (Z1, Z2, Z3)

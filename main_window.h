@@ -13,7 +13,6 @@
 #include "zoom_control_widget.h"
 #include "rotator_control_widget.h"
 #include "motor_control_widget.h"
-#include "motor_test_widget.h"
 #include "basler_exposuretime_widget.h"
 
 #include <QScrollArea>
@@ -88,7 +87,6 @@ private:
     ZoomControlWidget *m_zoomControlWidget;  // UI层
     RotatorControlWidget *m_rotatorControlWidget;  // 电机UI层
     MotorControlWidget *m_motorControlWidget; //平移台电机及移相电机
-    MotorTestWidget *m_motorTestWidget = nullptr; // 临时：偏摆轴测试
     BaslerExposuretimeWidget *m_baslerExposureWidget = nullptr;  //basler相机曝光时间设置
     MeasurementControlWidget *m_measurementControlWidget = nullptr;  // 执行测量控件
 

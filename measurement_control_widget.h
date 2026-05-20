@@ -10,6 +10,7 @@
 #include <vector>
 #include <opencv2/opencv.hpp>
 #include "algorithm/alg.h"
+#include "algorithm/PhaseProcessor.h"
 #include "image_cropper.h"
 #include "interfe_namespace.h"
 
@@ -102,6 +103,9 @@ private slots:
     void onWorkerFailed(const QString& errorMsg);
     void onWorkerFirstImageReady(const QImage& firstImage);
 
+    // Zernike去除项切换
+    void onZernikeToggled();
+
 private:
     Ui::MeasurementControlWidget *ui;
 
@@ -158,6 +162,11 @@ private:
     int m_initialPositionY = 0;
     int m_initialPositionZ = 0;
     bool m_hasInitialPosition = false;  // 是否已记录初始位置
+
+    // 最近一次测量结果（用于 Zernike 重处理）
+    APDAResult m_lastResult;
+    uint32_t getZernikeRemoveMask() const;
+    void reprocessZernike();
 
     // 辅助函数
     void setState(State state);

@@ -11,7 +11,9 @@
 cv::Mat APDA(
     const std::vector<cv::Mat>& noisedIs,
     const cv::Mat& mask,
-    double maxTiltFactor
+    double maxTiltFactor,
+    cv::Mat* unwrappedPhase_out,
+    cv::Mat* phaseMask_out
     )
 {
     const int estSize = 256;
@@ -92,10 +94,16 @@ cv::Mat APDA(
 
     //后处理
     PhaseProcessor processor;
-    cv::Mat finalPhase = processor.postProcess(temp.estPhase, temp.estPhase, maskForNPDA);
+    cv::Mat unwrappedPhase;
+    cv::Mat finalPhase = processor.postProcess(temp.estPhase, temp.estPhase, maskForNPDA, 'P', &unwrappedPhase);
 
-
-
+    // Output unwrapped phase and mask if requested
+    if (unwrappedPhase_out) {
+        *unwrappedPhase_out = unwrappedPhase;
+    }
+    if (phaseMask_out) {
+        *phaseMask_out = maskForNPDA.clone();
+    }
 
     return finalPhase;
 }

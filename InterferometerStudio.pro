@@ -34,7 +34,6 @@ SOURCES += \
     roi_selection_dialog.cpp \
     motor_control_widget.cpp \
     motor_controller.cpp \
-    motor_test_widget.cpp \
     motor_serial.cpp \
     page_process2d.cpp \
     page_process3d.cpp \
@@ -79,7 +78,6 @@ HEADERS += \
     roi_selection_dialog.h \
     motor_control_widget.h \
     motor_controller.h \
-    motor_test_widget.h \
     motor_serial.h \
     page_process2d.h \
     page_process3d.h \

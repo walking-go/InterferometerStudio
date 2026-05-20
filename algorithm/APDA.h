@@ -9,5 +9,7 @@
 cv::Mat APDA(
     const std::vector<cv::Mat>& noisedIs,
     const cv::Mat& mask,
-    double maxTiltFactor
+    double maxTiltFactor,
+    cv::Mat* unwrappedPhase_out = nullptr,
+    cv::Mat* phaseMask_out = nullptr
 );

@@ -287,12 +287,6 @@ void MainWindow::initCalibratePage() {
     m_motorControlWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     caliScrollLayout->addWidget(m_motorControlWidget);
 
-    // 3.5 临时：偏摆轴测试模块
-    m_motorTestWidget = new MotorTestWidget();
-    m_motorTestWidget->setMotorController(m_motorControlWidget->getMotorController());
-    m_motorTestWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    caliScrollLayout->addWidget(m_motorTestWidget);
-
     // 4. Basler相机曝光时间控制面板
     m_baslerExposureWidget = new BaslerExposuretimeWidget(m_cameraController->baslerCameraThread());
     m_baslerExposureWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);

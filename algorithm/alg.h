@@ -40,6 +40,8 @@ struct APDAResult{
         APDAResult shs_result;
         shs_result.original_img = this->original_img.copy();
         shs_result.wavefront = this->wavefront.clone();
+        shs_result.unwrapped_phase = this->unwrapped_phase.clone();
+        shs_result.phase_mask = this->phase_mask.clone();
         shs_result.real_per_pix = this->real_per_pix;
         shs_result.max_slope = this->max_slope;
         shs_result.n_x = this->n_x;
@@ -47,8 +49,6 @@ struct APDAResult{
 
         shs_result.wavefront_pv = this->wavefront_pv;
         shs_result.wavefront_rms = this->wavefront_rms;
-        // shs_result.sphere_pv = this->sphere_pv;
-        // shs_result.sphere_rms = this->sphere_rms;
 
         shs_result.is_valid = this->is_valid;
         shs_result.save_path = this->save_path;
@@ -56,6 +56,8 @@ struct APDAResult{
     };
     QImage original_img;
     cv::Mat wavefront;
+    cv::Mat unwrapped_phase;  // Unwrapped phase before Zernike removal
+    cv::Mat phase_mask;       // Processing mask (CV_8UC1)
     double real_per_pix;
 
     //QVector<double> zernike_coef;

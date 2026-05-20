@@ -15,6 +15,7 @@ static constexpr int    DOWNSAMPLE_RATE = 4;
 static constexpr double VALID_THRESH    = 0.05;
 static constexpr double RELIABLE_THRESH = 0.17;
 static constexpr double OUTLIER_THRESH  = 10.0;
+static constexpr double D_FALLBACK_TILT_PV_THRESH = 0.5;  // rad, triggers linear regression fallback
 
 // ============================================================
 // Internal data structures
@@ -575,6 +576,63 @@ DeltaEstimationResult initCoeffEst_NLS(
 
         // Step 4: Local refinement
         localRefine(bestKx, bestKy, bestD, bestResidual, kxRange, kyRange, xValid, yValid, alphaValid);
+
+        // Step 5: Fallback for ill-conditioned regime (small tilt)
+        // When tilt is small, the LS design matrix A=[cos(q), -sin(q)] becomes
+        // ill-conditioned, making d estimation unreliable.
+        // Fallback: linear regression on estCosDelta to jointly estimate kx, ky, d.
+        //   cos(kx*x + ky*y + d) ≈ a0 + a1*x + a2*y  (1st-order Taylor)
+        {
+            double estTiltPV = W * std::sqrt(bestKx * bestKx + bestKy * bestKy);
+            bool useFallback = (maxDisturbTiltPV < D_FALLBACK_TILT_PV_THRESH)
+                            || (estTiltPV < D_FALLBACK_TILT_PV_THRESH);
+
+            if (useFallback) {
+                // Collect full-resolution valid pixels (not downsampled)
+                std::vector<double> xFull, yFull, zFull;
+                for (int r = 0; r < innerH; ++r) {
+                    for (int c = 0; c < innerW; ++c) {
+                        if (combinedIdx.at<uchar>(r, c) != 0) {
+                            xFull.push_back(static_cast<double>(c + 2));
+                            yFull.push_back(static_cast<double>(r + 2));
+                            zFull.push_back(static_cast<double>(estCosDelta.at<float>(r, c)));
+                        }
+                    }
+                }
+                int nFull = static_cast<int>(xFull.size());
+                if (nFull >= 3) {
+                    // Solve z = a0 + a1*x + a2*y via normal equations (3x3)
+                    double S1 = nFull, Sx = 0, Sy = 0, Sxx = 0, Sxy = 0, Syy = 0;
+                    double Sz = 0, Sxz = 0, Syz = 0;
+                    for (int p = 0; p < nFull; ++p) {
+                        double x = xFull[p], y = yFull[p], z = zFull[p];
+                        Sx += x;    Sy += y;
+                        Sxx += x*x; Sxy += x*y; Syy += y*y;
+                        Sz += z;    Sxz += x*z; Syz += y*z;
+                    }
+                    // A^T A = [[S1, Sx, Sy], [Sx, Sxx, Sxy], [Sy, Sxy, Syy]]
+                    // A^T b = [Sz, Sxz, Syz]
+                    // Solve via Cramer's rule for 3x3
+                    double det = S1*(Sxx*Syy - Sxy*Sxy) - Sx*(Sx*Syy - Sxy*Sy) + Sy*(Sx*Sxy - Sxx*Sy);
+                    if (std::abs(det) > 1e-15) {
+                        double a0 = (Sz*(Sxx*Syy - Sxy*Sxy) - Sx*(Sxz*Syy - Syz*Sxy) + Sy*(Sxz*Sxy - Syz*Sxx)) / det;
+                        double a1 = (S1*(Sxz*Syy - Syz*Sxy) - Sz*(Sx*Syy - Sxy*Sy) + Sy*(Sx*Syz - Sxz*Sy)) / det;
+                        double a2 = (S1*(Sxx*Syz - Sxz*Sxy) - Sx*(Sx*Syz - Sxz*Sy) + Sz*(Sx*Sxy - Sxx*Sy)) / det;
+
+                        // Clamp a0 to [-1, 1] for acos
+                        a0 = std::max(-1.0, std::min(1.0, a0));
+                        double d_lr = std::acos(a0);
+                        double sinD = std::sin(d_lr);
+
+                        bestD = d_lr;
+                        if (std::abs(sinD) > 0.1) {
+                            bestKx = -a1 / sinD;
+                            bestKy = -a2 / sinD;
+                        }
+                    }
+                }
+            }
+        }
 
         // Store result with d in [0, 2*pi)
         double dMod = std::fmod(bestD, 2.0 * CV_PI);

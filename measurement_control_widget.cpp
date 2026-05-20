@@ -13,6 +13,7 @@
 #include <QDir>
 #include <QEventLoop>
 #include <QThread>
+#include <cmath>
 
 MeasurementControlWidget::MeasurementControlWidget(QWidget *parent)
     : QWidget(parent)
@@ -59,6 +60,14 @@ MeasurementControlWidget::MeasurementControlWidget(QWidget *parent)
             this, &MeasurementControlWidget::onBrowseHistoryPathClicked);
     connect(ui->btn_processHistory, &QPushButton::clicked,
             this, &MeasurementControlWidget::onProcessHistoryClicked);
+
+    // Zernike去除项按钮
+    connect(ui->btn_zPiston, &QPushButton::toggled, this, &MeasurementControlWidget::onZernikeToggled);
+    connect(ui->btn_zTilt, &QPushButton::toggled, this, &MeasurementControlWidget::onZernikeToggled);
+    connect(ui->btn_zPower, &QPushButton::toggled, this, &MeasurementControlWidget::onZernikeToggled);
+    connect(ui->btn_zAstigmatism, &QPushButton::toggled, this, &MeasurementControlWidget::onZernikeToggled);
+    connect(ui->btn_zComa, &QPushButton::toggled, this, &MeasurementControlWidget::onZernikeToggled);
+    connect(ui->btn_zSpherical, &QPushButton::toggled, this, &MeasurementControlWidget::onZernikeToggled);
 
     // 初始化保存路径
     initSavePath();
@@ -370,11 +379,12 @@ void MeasurementControlWidget::onWorkerFinished(const APDAResult& result)
     // 测量完成后自动复位电机到初始位置
     resetMotorsToInitialPosition();
 
+    // 保存结果用于 Zernike 重处理
+    m_lastResult = result.copy();
+
     setState(Idle);
     updateProgress(100);
     updateStatus("测量完成，电机已复位");
-
-    // qDebug() << "[MeasurementControlWidget] 测量完成，发送结果";
 
     // 发送结果信号（结果已包含original_img）
     emit measurementCompleted(result);
@@ -849,4 +859,56 @@ void MeasurementControlWidget::resetMotorsToInitialPosition()
     QThread::msleep(200);  // 等待Z轴完成
 
     qDebug() << "[MeasurementControlWidget] 电机已复位到初始位置";
+}
+
+// ==================== Zernike 去除项相关 ====================
+
+uint32_t MeasurementControlWidget::getZernikeRemoveMask() const
+{
+    uint32_t mask = 0;
+    if (ui->btn_zPiston->isChecked())      mask |= PhaseProcessor::ZERNIKE_PISTON;
+    if (ui->btn_zTilt->isChecked())        mask |= PhaseProcessor::ZERNIKE_TILT;
+    if (ui->btn_zPower->isChecked())       mask |= PhaseProcessor::ZERNIKE_POWER;
+    if (ui->btn_zAstigmatism->isChecked()) mask |= PhaseProcessor::ZERNIKE_ASTIGMATISM;
+    if (ui->btn_zComa->isChecked())        mask |= PhaseProcessor::ZERNIKE_COMA;
+    if (ui->btn_zSpherical->isChecked())   mask |= PhaseProcessor::ZERNIKE_SPHERICAL;
+    return mask;
+}
+
+void MeasurementControlWidget::onZernikeToggled()
+{
+    // Only reprocess if we have a valid result with unwrapped phase
+    if (!m_lastResult.is_valid || m_lastResult.unwrapped_phase.empty()) {
+        return;
+    }
+    reprocessZernike();
+}
+
+void MeasurementControlWidget::reprocessZernike()
+{
+    uint32_t removeMask = getZernikeRemoveMask();
+
+    PhaseProcessor processor;
+    cv::Mat newWavefront = processor.removeZernikeTerms(
+        m_lastResult.unwrapped_phase, m_lastResult.phase_mask, removeMask);
+
+    // Build updated result
+    APDAResult updated = m_lastResult.copy();
+    updated.wavefront = newWavefront;
+
+    // Recalculate PV/RMS
+    double minVal, maxVal;
+    cv::minMaxLoc(newWavefront, &minVal, &maxVal, nullptr, nullptr, m_lastResult.phase_mask);
+    updated.wavefront_pv = maxVal - minVal;
+
+    cv::Scalar meanVal = cv::mean(newWavefront, m_lastResult.phase_mask);
+    cv::Mat diff = newWavefront - meanVal[0];
+    cv::Mat squared;
+    cv::multiply(diff, diff, squared);
+    cv::Scalar sumSq = cv::mean(squared, m_lastResult.phase_mask);
+    updated.wavefront_rms = std::sqrt(sumSq[0]);
+
+    updated.save_path = "";  // Don't re-save images on Zernike toggle
+
+    emit measurementCompleted(updated);
 }
